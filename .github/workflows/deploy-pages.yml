@@ -3,11 +3,8 @@
 name: Deploy Static site to Pages
 
 on:
-  push:
-    # main分支代码推送时触发构建部署
-    branches: [main]
-  # 支持网页端手动触发工作流
-  workflow_dispatch:
+  # 支持外部触发工作流
+  workflow_call:
 
 # 配置工作流所需权限，Pages部署必须
 permissions:
