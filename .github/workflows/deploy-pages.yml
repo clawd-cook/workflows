@@ -1,47 +1,66 @@
+# GitHub Pages 静态站点自动部署工作流
+# 触发条件：main分支推送代码 / 手动在Actions页面触发工作流
 name: Deploy Static site to Pages
 
 on:
   push:
+    # main分支代码推送时触发构建部署
     branches: [main]
-
+  # 支持网页端手动触发工作流
   workflow_dispatch:
 
+# 配置工作流所需权限，Pages部署必须
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: read        # 读取仓库源码权限
+  pages: write          # 写入GitHub Pages服务权限
+  id-token: write       # OIDC身份令牌，用于Pages部署鉴权
 
+# 并发控制：pages分组，关闭"取消正在运行任务"，允许同时部署
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
+  # 构建任务：编译项目产出dist静态产物
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # 拉取完整git历史，部分构建工具需要完整提交记录
+
+      # 安装pnpm包管理器
       - uses: pnpm/action-setup@v4
+
+      # 配置Node.js运行环境，开启pnpm缓存加速依赖安装
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
+
+      # 严格根据pnpm-lock.yaml安装依赖，保证依赖版本一致性
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # 执行项目打包构建，输出产物至dist目录
       - name: Build
         run: pnpm build
+
+      # 上传dist构建产物作为工作流artifact，供deploy任务使用
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
+  # 部署任务：将构建产物发布到GitHub Pages
   deploy:
+    # 绑定github‑pages环境，部署后页面url从action输出变量获取
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    # 必须等待build构建Job完成之后再执行部署
     needs: build
     runs-on: ubuntu-latest
     name: Deploy
